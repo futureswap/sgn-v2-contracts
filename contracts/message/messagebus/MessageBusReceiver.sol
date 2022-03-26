@@ -21,6 +21,10 @@ contract MessageBusReceiver is Ownable {
     address public pegBridgeV2; // peg bridge address
     address public pegVaultV2; // peg original vault address
 
+    // minimum amount of gas needed by this contract before it tries to
+    // deliver a message to the target contract.
+    uint256 public preExecuteMessageGasUsage;
+
     event Executed(
         MsgDataTypes.MsgType msgType,
         bytes32 msgId,
@@ -244,6 +248,7 @@ contract MessageBusReceiver is Ownable {
         private
         returns (IMessageReceiverApp.ExecuctionStatus)
     {
+        uint256 gasLeftBeforeExecution = gasleft();
         (bool ok, bytes memory res) = address(_transfer.receiver).call{value: msg.value}(
             abi.encodeWithSelector(
                 IMessageReceiverApp.executeMessageWithTransfer.selector,
@@ -258,6 +263,15 @@ contract MessageBusReceiver is Ownable {
         if (ok) {
             return abi.decode((res), (IMessageReceiverApp.ExecuctionStatus));
         }
+
+        uint256 gasLeftAfterExecution = gasleft();
+        uint256 maxTargetGasLimit = block.gaslimit - preExecuteMessageGasUsage;
+        if (gasLeftBeforeExecution < maxTargetGasLimit && gasLeftAfterExecution <= gasLeftBeforeExecution / 64) {
+            assembly {
+                invalid()
+            }
+        }
+
         return IMessageReceiverApp.ExecuctionStatus.Fail;
     }
 
@@ -265,6 +279,7 @@ contract MessageBusReceiver is Ownable {
         private
         returns (IMessageReceiverApp.ExecuctionStatus)
     {
+        uint256 gasLeftBeforeExecution = gasleft();
         (bool ok, bytes memory res) = address(_transfer.receiver).call{value: msg.value}(
             abi.encodeWithSelector(
                 IMessageReceiverApp.executeMessageWithTransferFallback.selector,
@@ -279,6 +294,15 @@ contract MessageBusReceiver is Ownable {
         if (ok) {
             return abi.decode((res), (IMessageReceiverApp.ExecuctionStatus));
         }
+
+        uint256 gasLeftAfterExecution = gasleft();
+        uint256 maxTargetGasLimit = block.gaslimit - preExecuteMessageGasUsage;
+        if (gasLeftBeforeExecution < maxTargetGasLimit && gasLeftAfterExecution <= gasLeftBeforeExecution / 64) {
+            assembly {
+                invalid()
+            }
+        }
+
         return IMessageReceiverApp.ExecuctionStatus.Fail;
     }
 
@@ -286,6 +310,7 @@ contract MessageBusReceiver is Ownable {
         private
         returns (IMessageReceiverApp.ExecuctionStatus)
     {
+        uint256 gasLeftBeforeExecution = gasleft();
         (bool ok, bytes memory res) = address(_transfer.receiver).call{value: msg.value}(
             abi.encodeWithSelector(
                 IMessageReceiverApp.executeMessageWithTransferRefund.selector,
@@ -298,6 +323,15 @@ contract MessageBusReceiver is Ownable {
         if (ok) {
             return abi.decode((res), (IMessageReceiverApp.ExecuctionStatus));
         }
+
+        uint256 gasLeftAfterExecution = gasleft();
+        uint256 maxTargetGasLimit = block.gaslimit - preExecuteMessageGasUsage;
+        if (gasLeftBeforeExecution < maxTargetGasLimit && gasLeftAfterExecution <= gasLeftBeforeExecution / 64) {
+            assembly {
+                invalid()
+            }
+        }
+
         return IMessageReceiverApp.ExecuctionStatus.Fail;
     }
 
@@ -404,6 +438,7 @@ contract MessageBusReceiver is Ownable {
         private
         returns (IMessageReceiverApp.ExecuctionStatus)
     {
+        uint256 gasLeftBeforeExecution = gasleft();
         (bool ok, bytes memory res) = address(_route.receiver).call{value: msg.value}(
             abi.encodeWithSelector(
                 IMessageReceiverApp.executeMessage.selector,
@@ -416,6 +451,15 @@ contract MessageBusReceiver is Ownable {
         if (ok) {
             return abi.decode((res), (IMessageReceiverApp.ExecuctionStatus));
         }
+
+        uint256 gasLeftAfterExecution = gasleft();
+        uint256 maxTargetGasLimit = block.gaslimit - preExecuteMessageGasUsage;
+        if (gasLeftBeforeExecution < maxTargetGasLimit && gasLeftAfterExecution <= gasLeftBeforeExecution / 64) {
+            assembly {
+                invalid()
+            }
+        }
+
         return IMessageReceiverApp.ExecuctionStatus.Fail;
     }
 
@@ -509,7 +553,7 @@ contract MessageBusReceiver is Ownable {
         }
     }
 
-    // ================= contract addr config =================
+    // ================= config =================
 
     function setLiquidityBridge(address _addr) public onlyOwner {
         require(_addr != address(0), "invalid address");
@@ -539,5 +583,9 @@ contract MessageBusReceiver is Ownable {
         require(_addr != address(0), "invalid address");
         pegVaultV2 = _addr;
         emit PegVaultV2Updated(pegVaultV2);
+    }
+
+    function setPreExecuteMessageGasUsage(uint256 _usage) public onlyOwner {
+        preExecuteMessageGasUsage = _usage;
     }
 }
